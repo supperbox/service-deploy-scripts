@@ -3,23 +3,24 @@ set -euo pipefail
 
 # -------------------- 配置区 (可通过环境变量覆盖) --------------------
 # 说明：把常用的可定制参数集中放在文件顶部，便于运维/CI 覆盖与阅读
-# - 若希望用不同值运行脚本，可在运行时导出环境变量覆盖（例如：export REPO_DIR=/path && ./updateBlog.sh）
+# - 若希望用不同值运行脚本，可在运行时导出环境变量覆盖（例如：export REPO_DIR=/path && ./update.sh）
 # - 变量含义见每行注释
 
-# 脚本所在目录（默认：脚本文件所在目录），用于拼接相对路径和日志位置
+# 脚本所在目录（默认：脚本文件所在目录）‘，用于拼接相对路径和日志位置
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 待更新项目仓库目录（默认 /var/www/personBlogSite）。可用环境变量 REPO_DIR 覆盖。
-REPO_DIR="${REPO_DIR:-/var/www/personBlogSite}"
+# 要更新的仓库目录（默认 /var/www/express-service）。可用环境变量 REPO_DIR 覆盖。
+REPO_DIR="${REPO_DIR:-/var/www/express-service}"
 
-# 要切换并重置到的远端分支（默认 master）。可用 BRANCH 覆盖。
-BRANCH="${BRANCH:-master}"
+# 要切换并重置到的远端分支。
+# - 如未设置 BRANCH，则自动读取 origin/HEAD 指向的默认分支。
+BRANCH="${BRANCH:-}"
 
-# 日志文件路径（默认写到脚本目录下的 updateBlog.log）。可用 LOGFILE 覆盖。
-LOGFILE="${LOGFILE:-${SCRIPT_DIR}/updateBlog.log}"
+# 日志文件路径（默认写到脚本目录下）。可用 LOGFILE 覆盖。
+LOGFILE="${LOGFILE:-${SCRIPT_DIR}/updateExpress.log}"
 
 # PM2 进程名（若为空则不使用 pm2）。可用 PM2_APP_NAME 覆盖。
-PM2_APP_NAME="${PM2_APP_NAME:-blog}"
+PM2_APP_NAME="${PM2_APP_NAME:-ei}"
 
 # systemd 服务名（若使用 systemd 重启，这里设置；可用 SERVICE_NAME 覆盖）。
 SERVICE_NAME="${SERVICE_NAME:-}"
@@ -43,19 +44,14 @@ fail() {
 trap 'fail "Script interrupted or failed"' INT TERM
 
 # 开始记录基本信息，便于后续排查
-log "=== updateBlog.sh start ==="
+log "=== updateExpress.sh start ==="
 log "Script dir: $SCRIPT_DIR"
 log "Repo dir: $REPO_DIR"
-log "Branch: $BRANCH"
 log "Logfile: $LOGFILE"
 
 # 检查 git 是否可用（这是必须工具）
 if ! command -v git >/dev/null 2>&1; then
   fail "git is not installed or not in PATH"
-fi
-
-if [ ! -d "$REPO_DIR" ]; then
-  fail "Repo dir does not exist: $REPO_DIR"
 fi
 
 # 切换到仓库目录并确保存在 .git（防止误在错误目录执行）
@@ -70,10 +66,16 @@ fi
 log "Fetching remote..."
 git fetch --all --prune >>"$LOGFILE" 2>&1 || fail "git fetch failed"
 
+if [ -z "$BRANCH" ]; then
+  # 例如：refs/remotes/origin/HEAD -> origin/master
+  BRANCH="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')" || true
+fi
+if [ -z "$BRANCH" ]; then
+  BRANCH="master"
+fi
+log "Branch: $BRANCH"
+
 log "Resetting to origin/$BRANCH ..."
-# 兼容：本地没有该分支或分支名不同导致 checkout 失败
-# - 优先：切到本地分支
-# - 失败：从 origin/$BRANCH 创建/覆盖本地分支
 if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
   git checkout "$BRANCH" >>"$LOGFILE" 2>&1 || fail "git checkout $BRANCH failed"
 else
@@ -98,6 +100,7 @@ else
 fi
 
 
+
 # 重启服务：优先使用 pm2（适用于 Node.js 应用），其次尝试 systemd（适用于 Linux 服务）
 # - 若同时未提供 PM2_APP_NAME 和 SERVICE_NAME，则脚本仅完成代码同步与构建，不会重启服务
 if [ -n "$PM2_APP_NAME" ] && command -v pm2 >/dev/null 2>&1; then
@@ -115,5 +118,5 @@ else
   log "No PM2_APP_NAME or SERVICE_NAME provided (or pm2/systemctl not available). Skipping restart."
 fi
 
-log "=== updateBlog.sh finished successfully ==="
+  log "=== updateExpress.sh finished successfully ==="
 exit 0
