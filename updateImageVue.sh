@@ -62,49 +62,6 @@ fi
 
 git reset --hard "origin/$BRANCH" >>"$LOGFILE" 2>&1 || fail "git reset --hard origin/$BRANCH failed"
 
-if [ -f package.json ]; then
-  case "$INSTALL_DEPS" in
-    skip)
-      log "INSTALL_DEPS=skip; skipping dependency install"
-      ;;
-    pnpm)
-      command -v pnpm >/dev/null 2>&1 || fail "pnpm not found"
-      log "Installing dependencies with pnpm (pnpm install --frozen-lockfile)..."
-      pnpm install --frozen-lockfile >>"$LOGFILE" 2>&1 || fail "pnpm install failed"
-      ;;
-    npm)
-      command -v npm >/dev/null 2>&1 || fail "npm not found"
-      log "Installing dependencies with npm (npm ci)..."
-      npm ci >>"$LOGFILE" 2>&1 || fail "npm ci failed"
-      ;;
-    auto|*)
-      if command -v pnpm >/dev/null 2>&1; then
-        log "Installing dependencies with pnpm (pnpm install --frozen-lockfile)..."
-        pnpm install --frozen-lockfile >>"$LOGFILE" 2>&1 || fail "pnpm install failed"
-      elif command -v npm >/dev/null 2>&1; then
-        log "pnpm not found; falling back to npm (npm ci)..."
-        npm ci >>"$LOGFILE" 2>&1 || fail "npm ci failed"
-      else
-        log "No pnpm or npm found; skipping dependency install"
-      fi
-      ;;
-  esac
-else
-  log "No package.json found; skipping dependency install"
-fi
-
-log "Building project..."
-if [ -f package.json ]; then
-  if command -v pnpm >/dev/null 2>&1; then
-    pnpm run build >>"$LOGFILE" 2>&1 || fail "pnpm build failed"
-  elif command -v npm >/dev/null 2>&1; then
-    npm run build >>"$LOGFILE" 2>&1 || fail "npm build failed"
-  else
-    fail "No pnpm or npm found; cannot build project"
-  fi
-else
-  log "No package.json found; skipping build"
-fi
 
 log "=== updateImageVue.sh finished successfully ==="
 exit 0
