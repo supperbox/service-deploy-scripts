@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+set -o errtrace
 
 # -------------------- 配置区 (可通过环境变量覆盖) --------------------
 # 说明：把常用的可定制参数集中放在文件顶部，便于运维/CI 覆盖与阅读
@@ -40,8 +41,9 @@ fail() {
   exit 1
 }
 
-# 捕获中断与终止信号，确保记录日志并以非零退出
-trap 'fail "Script interrupted or failed"' INT TERM
+# 捕获中断、终止与错误，记录失败命令与行号，便于排查
+trap 'fail "Script interrupted or failed: cmd=\"$BASH_COMMAND\" line=$LINENO"' INT TERM
+trap 'fail "Script error: cmd=\"$BASH_COMMAND\" line=$LINENO"' ERR
 
 # 开始记录基本信息，便于后续排查
 log "=== updateExpress.sh start ==="
