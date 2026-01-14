@@ -15,6 +15,12 @@ LOGFILE="${LOGFILE:-${SCRIPT_DIR}/updateImageVue.log}"
 
 # 安装依赖命令策略：auto|pnpm|npm|skip
 INSTALL_DEPS="${INSTALL_DEPS:-pnpm}"
+
+# pnpm install 参数（可选）
+PNPM_INSTALL_ARGS="${PNPM_INSTALL_ARGS:-}"
+
+# pnpm build 参数（可选）
+PNPM_BUILD_ARGS="${PNPM_BUILD_ARGS:-}"
 # ----------------------------------------------------------------------
 
 timestamp() { date '+%Y-%m-%d %H:%M:%S'; }
@@ -61,6 +67,34 @@ else
 fi
 
 git reset --hard "origin/$BRANCH" >>"$LOGFILE" 2>&1 || fail "git reset --hard origin/$BRANCH failed"
+
+log "Installing dependencies... (strategy: $INSTALL_DEPS)"
+case "$INSTALL_DEPS" in
+  skip)
+    log "Skipping dependency installation"
+    ;;
+  auto|pnpm)
+    if ! command -v pnpm >/dev/null 2>&1; then
+      fail "pnpm is not installed or not in PATH"
+    fi
+    pnpm install ${PNPM_INSTALL_ARGS} >>"$LOGFILE" 2>&1 || fail "pnpm install failed"
+    ;;
+  npm)
+    if ! command -v npm >/dev/null 2>&1; then
+      fail "npm is not installed or not in PATH"
+    fi
+    npm install >>"$LOGFILE" 2>&1 || fail "npm install failed"
+    ;;
+  *)
+    fail "Unknown INSTALL_DEPS strategy: $INSTALL_DEPS (expected: auto|pnpm|npm|skip)"
+    ;;
+esac
+
+log "Building..."
+if ! command -v pnpm >/dev/null 2>&1; then
+  fail "pnpm is not installed or not in PATH"
+fi
+pnpm run build ${PNPM_BUILD_ARGS} >>"$LOGFILE" 2>&1 || fail "pnpm run build failed"
 
 
 log "=== updateImageVue.sh finished successfully ==="
